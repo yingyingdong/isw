@@ -8,17 +8,17 @@ name_pre = 'BASS'
 name_mag = '-30-22'
 name_z   = 'z0.01-0.6'
 radius   = '5'
-rmax     = 'r10-600'#'r1-300'#'Rmax5'
+rmax     = 'r5-900'#'r1-300'#'Rmax5'
 jack     = 'jack4'
-njack = 55#55#55#752#192
-nr    = 15
+njack = 53#55#55#752#192
+nr    = 20
 nside = 'nside512nsidecmb512nside'+jack
-name_use = 'random-'
+name_use = 'gal-'#'gal-'#'ldp-'#'random-'
 xx    = np.zeros((njack,4,nr))
 err   = np.zeros(nr)
-xm = np.loadtxt('../data/'+name_pre+name_use+'-/bass'+name_mag+name_z+'R'+radius+rmax+'nbin'+np.str(nr)+nside+'.dat')
+xm = np.loadtxt('data/'+name_use+'bass'+name_mag+name_z+'R'+radius+rmax+'nbin'+np.str(nr)+nside+'.dat')
 for i in np.arange(njack):
-    xtmp = np.loadtxt('../data/'+name_pre+name_use+'/-bass'+name_mag+name_z+'ijack'+np.str(i)+'R'+radius+rmax+'nbin'+np.str(nr)+nside+'.dat')
+    xtmp = np.loadtxt('data/'+name_use+'bass'+name_mag+name_z+'ijack'+np.str(i)+'R'+radius+rmax+'nbin'+np.str(nr)+nside+'.dat')
     for j in np.arange(njack):
         if(i!=j):
             xx[j,0] = xx[j,0] + xtmp[0]*xtmp[2]
@@ -27,16 +27,18 @@ for i in np.arange(njack):
     xx[i,0] = xx[i,0]/xx[i,2]
 for i in np.arange(nr):
     err[i] = np.sqrt(njack)*np.sqrt(np.var(xx[:,0,i]))
-    
+
+np.savetxt('data/error-'+name_use+'bass'+name_mag+name_z+'R'+radius+rmax+'nbin'+np.str(nr)+nside+'.dat',np.vstack((xm[1],xm[0]*1e6,err*1e6)))
 '''
-plt.title('ISW around LDP,'+name_z+',mag_r='+name_mag+',R_s'+radius+' arcmin')
+plt.title('ISW around galaxies,'+name_z+',mag_r='+name_mag+',R_s='+radius+' arcmin')
+#plt.title('ISW around LDPs,'+name_z+',mag_r='+name_mag+',R_s='+radius+' arcmin')
 plt.errorbar(xm[1],xm[0]*1e6,yerr=err*1e6,capsize=2,label='jack'+np.str(njack))
 #xrand = np.loadtxt('../data/random/random19-20-1-300-5.dat')
 #plt.plot(xrand[1],xrand[0]*1e6,label='700000 random points',color='grey',ls='--')
 plt.axhline(0,ls='--',c='grey')
 plt.xscale('log')
 plt.legend()
-plt.ylim(-1,0.5)
+plt.ylim(-1.6,0.5)
 plt.xlabel('R[acrmin]')
 plt.ylabel(r'Cross-corr[$\rm{\mu K}$]')
 plt.tight_layout()
