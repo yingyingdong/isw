@@ -7,23 +7,19 @@ import treecorr as tc
 import prepare_hp as pre
 
 Radius     = '5'
-flag_load  = 1
-flag_group = 2
-m1,m2      = np.sys.argv[1], np.sys.argv[2]
+flag_group = 1
+m1,m2      = '-30','-22'#np.sys.argv[1], np.sys.argv[2]
 z1,z2      = '0.01','0.6'
 M1,M2,Z1,Z2= np.float(m1),np.float(m2),np.float(z1),np.float(z2)
 flag_plk   = 1
 au         = 180./np.pi
 nside      = 512
-nside_mask = 512
 nside_cmb  = 512
 nside_jack = 4
 
 #load mask files:
 name_pre = 'bass'
-mask = np.load('../data/'+name_pre+'mask'+np.str(nside_mask)+'.npy')
-if(nside_mask != nside): mask_new = pre.mask_nside12(mask,nside,nside_mask)
-else:                    mask_new = mask
+mask = np.load('/home/dfy/data/DelCals/Mask_cut50.npy')
 
 if(flag_group==3): #ldp
     name_load,name_save = '../data/BASS/'+name_pre+'ldp-pos'+Radius+'galaxy'+m1+m2+'z'+z1+'-'+z2+'R'+Radius,'ldp-'
@@ -48,24 +44,13 @@ class GENE_MAP():
         g_map      = g_map[index]
         return theta,phi,g_map
 
-gene = GENE_MAP(nside,mask_new)
+gene = GENE_MAP(nside,mask)
 #(1) load catalogue
 #(a) load LDPs for BASS
 if(flag_group==3):
-    if(flag_load==0):
-        ra,dec,idx = np.load(name_load+'.npy')
-        theta,phi,g_map  = gene.gene_map(self,ra,dec)
-        #check for every ldp postion about the arrounding mask
-        if(flag_group==3):
-            flag_use   = np.ones(theta.shape[0])
-            for i in np.arange(theta.shape[0]):
-                id_nei = hp.pixelfunc.get_all_neighbours(nside,theta=theta[i],phi=phi[i],nest=True)
-                if(np.count_nonzero(mask_new[id_nei]==0)>0): flag_use[i] = 0
-            index = flag_use>0
-            theta,phi,g_map = theta[index],phi[index],g_map[index]
-            np.save(name_load+np.str(nside)+'.npy',np.vstack((theta,phi,g_map)))
-    if(flag_load==1): 
-        theta,phi,g_map = np.load(name_load+np.str(nside)+'.npy')
+    ra,dec,idx = np.load(name_load+'.npy')
+    theta,phi,g_map  = gene.gene_map(ra,dec)
+#theta,phi = theta[0],phi[0]
 
 #(b) load BASS galaxies
 if(flag_group==1):
@@ -79,6 +64,7 @@ if(flag_group==2):
     ra,dec = np.load(name_load+'.npy')
     theta,phi,g_map = gene.gene_map(ra,dec)
     #(2) divide into smaller areas
+
 flag_area,ncount  = pre.divide_area_second(theta,phi,nside_jack)
 g_ra,g_dec,g_map  = au*phi,au*(np.pi/2-theta),g_map
 
@@ -104,17 +90,17 @@ cmb_ra[index] = cmb_ra[index]+360
 #cmb_ra,cmb_dec = cmb_ra[index],cmb_dec[index]
 
 #(4)calculate cross correlation
-rmin,rmax  =  10,10*60
+rmin,rmax  =  5,15*60#10,15*60
 min_sep,max_sep = rmin,rmax
-nbins = 15
+nbins = 20
 
 dataK = tc.Catalog(k=cmb_map, ra=cmb_ra, dec=cmb_dec, ra_units='deg', dec_units='deg')
 datag = tc.Catalog(k=g_map,   ra=g_ra,   dec=g_dec,   ra_units='deg', dec_units='deg')
 Kg = tc.KKCorrelation( nbins=nbins, min_sep=min_sep, max_sep=max_sep, bin_slop=0.01, verbose=0, sep_units='arcmin' )
-Kg.process(dataK,datag,metric='Arc',num_threads=32)
+Kg.process(dataK,datag,metric='Arc',num_threads=25)
 xim   = Kg.xi
 rm    = Kg.meanr
-np.savetxt('../data/BASS/'+name_save+name_pre+m1+m2+'z'+z1+'-'+z2+'R'+Radius+'r'+np.str(rmin)+'-'+np.str(rmax)+'nbin'+np.str(nbins)+'nside'+np.str(nside)+'nsidecmb'+np.str(nside_cmb)+'nsidejack'+np.str(nside_jack)+'.dat',np.vstack((Kg.xi,Kg.meanr,Kg.npairs,np.sqrt(Kg.varxi))))
+np.savetxt('./data/'+name_save+name_pre+m1+m2+'z'+z1+'-'+z2+'R'+Radius+'r'+np.str(rmin)+'-'+np.str(rmax)+'nbin'+np.str(nbins)+'nside'+np.str(nside)+'nsidecmb'+np.str(nside_cmb)+'nsidejack'+np.str(nside_jack)+'.dat',np.vstack((Kg.xi,Kg.meanr,Kg.npairs,np.sqrt(Kg.varxi))))
 
 #(5)jackknife error bar
 flag_max = np.int32(flag_area.max())
@@ -125,10 +111,10 @@ for i in np.arange(flag_max):
     dataK = tc.Catalog(k=cmb_map, ra=cmb_ra, dec=cmb_dec, ra_units='deg', dec_units='deg')
     datag = tc.Catalog(k=g_map[index],ra=g_ra[index],dec=g_dec[index],ra_units='deg', dec_units='deg')
     Kg = tc.KKCorrelation( nbins=nbins, min_sep=min_sep, max_sep=max_sep, bin_slop=0.01, verbose=0, sep_units='arcmin' )
-    Kg.process(dataK,datag,metric='Arc',num_threads=32)
+    Kg.process(dataK,datag,metric='Arc',num_threads=25)
     xi[i,1] = Kg.xi
     xi[i,0] = Kg.meanr
-    np.savetxt('../data/BASS/'+name_save+name_pre+m1+m2+'z'+z1+'-'+z2+'ijack'+np.str(i)+'R'+Radius+'r'+np.str(rmin)+'-'+np.str(rmax)+'nbin'+np.str(nbins)+'nside'+np.str(nside)+'nsidecmb'+np.str(nside_cmb)+'nsidejack'+np.str(nside_jack)+'.dat',np.vstack((Kg.xi,Kg.meanr,Kg.npairs,np.sqrt(Kg.varxi))))
+    np.savetxt('./data/'+name_save+name_pre+m1+m2+'z'+z1+'-'+z2+'ijack'+np.str(i)+'R'+Radius+'r'+np.str(rmin)+'-'+np.str(rmax)+'nbin'+np.str(nbins)+'nside'+np.str(nside)+'nsidecmb'+np.str(nside_cmb)+'nsidejack'+np.str(nside_jack)+'.dat',np.vstack((Kg.xi,Kg.meanr,Kg.npairs,np.sqrt(Kg.varxi))))
 
 #(1)cmb_new = hp.ud_grade(cmb_map,512,order_in='nest',order_out='nest')
 #(2)step = (np.log10(rmax)-np.log10(rmin))/5
